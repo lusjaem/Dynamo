@@ -1,89 +1,42 @@
-import sys
 import clr
+clr.AddReference('RevitAPI')
+from Autodesk.Revit.DB import *
+clr.AddReference('RevitServices')
+from RevitServices.Persistence import DocumentManager
+from RevitServices.Transactions import TransactionManager
 
-# Import the System namespace from clr
-clr.AddReference("System")
-from System.Reflection import Assembly
-from System.IO import Path
+def add_shared_parameters_to_family(family_path, shared_parameters_file_path):
+    # Start a transaction
+    TransactionManager.Instance.EnsureInTransaction(doc)
 
-def get_shared_parameters_file_path(shared_parameters_filename):
-    # Get the executing assembly path
-    executing_assembly_path = Assembly.GetExecutingAssembly().Location
+    # Open the Revit family document for editing
+    fam_doc = doc.FamilyManager.OpenEditableFamily(family_path)
 
-    # Get the directory path of the executing assembly
-    executing_directory_path = Path.GetDirectoryName(executing_assembly_path)
+    # Load the shared parameters file
+    def_file_path = ModelPathUtils.ConvertUserVisiblePathToModelPath(shared_parameters_file_path)
+    def_file = fam_doc.Application.OpenSharedParameterFile()
+    def_file.Import(def_file_path)
 
-    # Combine the directory path with the shared parameters filename
-    shared_parameters_file_path = Path.Combine(executing_directory_path, shared_parameters_filename)
+    # Get the shared parameter group and definition from the file
+    group_name = 'My Parameters'  # Replace with your desired group name
+    group = def_file.Groups.get_Item(group_name)
+    param_defs = group.Definitions
 
-    return shared_parameters_file_path
-
-# Get the executing assembly path
-executing_assembly_path = Assembly.GetExecutingAssembly().Location
-
-# Get the directory path of the executing assembly
-executing_directory_path = System.IO.Path.GetDirectoryName(executing_assembly_path)
-
-# Combine the directory path with the family filename
-family_filename = "D:\MBorkowska\Pulpit\Dynamo\Families\MP_Windows_legend.rfa"
-family_path = System.IO.Path.Combine(executing_directory_path, family_filename)
-
-# Print the family file path
-print(family_path)
-
-# Usage example
-shared_parameters_filename = "MP_SharedParameters_Nokia"
-shared_parameters_file_path = get_shared_parameters_file_path(shared_parameters_filename)
-print(shared_parameters_file_path)
-
-
-def add_shared_parameters_to_family(family_path, shared_parameters_file):
-    # Set up the Revit application and document
-    app = DB.DocumentManager.Instance.CurrentUIApplication.Application
-    doc = DB.DocumentManager.Instance.CurrentDBDocument
-
-    # Open the family document
-    family_doc = app.OpenDocumentFile(family_path)
-
-    # Get the shared parameters definition file
-    shared_params_file = app.OpenSharedParameterFile()
-
-    # Create a new shared parameters group
-    group_name = "For Script"
-    group = shared_params_file.Groups.Create(group_name)
-
-    # Read the shared parameters from the text file
-    with open(shared_parameters_file, "r") as file:
-        lines = file.readlines()
-
-    # Create shared parameters
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-
-        param_name, param_type, inst_or_type, visible = line.split(",")
-
-        # Create the shared parameter definition
-        param_def = group.Definitions.Create(param_name, DB.ParameterType.Length, inst_or_type == "instance")
-
-        # Set the parameter properties
-        param_def.Visible = visible.lower() == "true"
-        param_def.UserModifiable = True
-
-        # Add the parameter to the family
-        if inst_or_type == "instance":
-            family_doc.FamilyManager.AddParameter(param_def, DB.FamilyParameterType.Instance)
-        else:
-            family_doc.FamilyManager.AddParameter(param_def, DB.FamilyParameterType.Type)
+    # Add the shared parameters to the family
+    for param_def in param_defs:
+        fam_doc.FamilyManager.AddParameter(param_def, BuiltInParameterGroup.PG_DATA)
 
     # Save and close the family document
-    family_doc.Save()
-    family_doc.Close()
+    fam_doc.Save()
+    fam_doc.Close(False)
 
-    return "Shared parameters added successfully!"
+    # End the transaction
+    TransactionManager.Instance.TransactionTaskDone()
 
-# Usage
+# Get the current Dynamo Revit document
+doc = DocumentManager.Instance.CurrentDBDocument
 
-result = add_shared_parameters_to_family(family_path, shared_parameters_file)
-print(result)
+# Usage example
+family_path = "C:/path/to/family.rfa"
+shared_parameters_file_path = "C:/path/to/shared_parameters.txt"
+add_shared_parameters_to_family(family_path, shared_parameters_file_path)
