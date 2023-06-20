@@ -1,7 +1,22 @@
 import sys
 import clr
-clr.AddReference("RevitAPI")
-import Autodesk.Revit.DB as DB
+
+# Import the System namespace from clr
+clr.AddReference("System")
+from System.Reflection import Assembly
+from System.IO import Path
+
+def get_shared_parameters_file_path(shared_parameters_filename):
+    # Get the executing assembly path
+    executing_assembly_path = Assembly.GetExecutingAssembly().Location
+
+    # Get the directory path of the executing assembly
+    executing_directory_path = Path.GetDirectoryName(executing_assembly_path)
+
+    # Combine the directory path with the shared parameters filename
+    shared_parameters_file_path = Path.Combine(executing_directory_path, shared_parameters_filename)
+
+    return shared_parameters_file_path
 
 # Get the executing assembly path
 executing_assembly_path = Assembly.GetExecutingAssembly().Location
@@ -15,18 +30,6 @@ family_path = System.IO.Path.Combine(executing_directory_path, family_filename)
 
 # Print the family file path
 print(family_path)
-
-def get_shared_parameters_file_path(shared_parameters_filename):
-    # Get the current document
-    doc = DocumentManager.Instance.CurrentDBDocument
-
-    # Get the current directory path
-    current_directory_path = doc.Path
-
-    # Combine the directory path with the shared parameters filename
-    shared_parameters_file_path = System.IO.Path.Combine(current_directory_path, shared_parameters_filename)
-
-    return shared_parameters_file_path
 
 # Usage example
 shared_parameters_filename = "MP_SharedParameters_Nokia"
