@@ -1,42 +1,67 @@
+#edited by Magdalena Borkowska
+import System
 import clr
-clr.AddReference('RevitAPI')
-from Autodesk.Revit.DB import *
-clr.AddReference('RevitServices')
+clr.AddReference('ProtoGeometry')
+from Autodesk.DesignScript.Geometry import *
+# Import ToDSType(bool) extension method
+clr.AddReference("RevitNodes")
+import Revit
+clr.ImportExtensions(Revit.Elements)
+# Import geometry conversion extension methods
+clr.ImportExtensions(Revit.GeometryConversion)
+# Import DocumentManager and TransactionManager
+clr.AddReference("RevitServices")
+import RevitServices
 from RevitServices.Persistence import DocumentManager
 from RevitServices.Transactions import TransactionManager
+from System.Collections.Generic import *
+# Import RevitAPI
+clr.AddReference("RevitAPI")
+import Autodesk
+from Autodesk.Revit.DB import *
 
-def add_shared_parameters_to_family(family_path, shared_parameters_file_path):
-    # Start a transaction
-    TransactionManager.Instance.EnsureInTransaction(doc)
+# The inputs to this node will be stored as a list in the IN variables.
+shared_parameters_file_path = IN[0]  #  the first item in the input list
+parameter_group_keys = IN[1]  #  the second item in the input list, a list of parameter group names
 
-    # Open the Revit family document for editing
-    fam_doc = doc.FamilyManager.OpenEditableFamily(family_path)
+# Read the shared parameters file
+shared_parameters = []
+with open(shared_parameters_file_path, "r") as file:
+    for line in file:
+        shared_parameters.append(line.strip())
 
-    # Load the shared parameters file
-    def_file_path = ModelPathUtils.ConvertUserVisiblePathToModelPath(shared_parameters_file_path)
-    def_file = fam_doc.Application.OpenSharedParameterFile()
-    def_file.Import(def_file_path)
+# Generate the parameter group dictionary
+parameter_group_dict = {group_name: i for i, group_name in enumerate(parameter_group_keys)}
 
-    # Get the shared parameter group and definition from the file
-    group_name = 'My Parameters'  # Replace with your desired group name
-    group = def_file.Groups.get_Item(group_name)
-    param_defs = group.Definitions
-
-    # Add the shared parameters to the family
-    for param_def in param_defs:
-        fam_doc.FamilyManager.AddParameter(param_def, BuiltInParameterGroup.PG_DATA)
-
-    # Save and close the family document
-    fam_doc.Save()
-    fam_doc.Close(False)
-
-    # End the transaction
-    TransactionManager.Instance.TransactionTaskDone()
-
-# Get the current Dynamo Revit document
+# Get the active Revit document
 doc = DocumentManager.Instance.CurrentDBDocument
 
-# Usage example
-family_path = "C:/path/to/family.rfa"
-shared_parameters_file_path = "C:/path/to/shared_parameters.txt"
-add_shared_parameters_to_family(family_path, shared_parameters_file_path)
+# Start a transaction
+transaction = Transaction(doc, "Add Shared Parameters")
+transaction.Start()
+
+# Add the shared parameters to the family's Family Types manager
+family_manager = doc.FamilyManager
+generated_groups = []  # List to store the generated parameter groups
+for param_name in shared_parameters:
+    # Determine the parameter group
+    parameter_group = parameter_group_dict.get(param_name, BuiltInParameterGroup.PG_DATA)
+
+    # Create the parameter
+    parameter = family_manager.AddParameter(param_name, parameter_group, True)
+
+    # Set other parameter properties as needed
+    # ...
+
+    # Add the parameter group to the generated groups list
+    generated_groups.append(parameter_group)
+
+# Commit the transaction
+transaction.Commit()
+
+# Save and close the family file
+doc.Save()
+doc.Close(False)
+
+# Assign the generated groups as output
+OUT = generated_groups
